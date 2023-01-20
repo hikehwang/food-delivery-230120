@@ -30,7 +30,7 @@ public class Deliveries  {
     
     
     
-    private String ordeerId;
+    private String orderId;
     
     
     

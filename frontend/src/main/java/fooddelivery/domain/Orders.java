@@ -69,8 +69,8 @@ public class Orders  {
         orderCanceled.publishAfterCommit();
 
     }
-    @PreRemove
-    public void onPreRemove(){
+    @PrePersist
+    public void onPrePersist(){
     }
 
     public static OrdersRepository repository(){

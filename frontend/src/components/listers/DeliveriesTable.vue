@@ -67,7 +67,7 @@
             headers: 
                 [
                     { text: "id", value: "id" },
-                    { text: "ordeerId", value: "ordeerId" },
+                    { text: "orderId", value: "orderId" },
                     { text: "storeId", value: "storeId" },
                     { text: "menuId", value: "menuId" },
                     { text: "qty", value: "qty" },
@@ -90,7 +90,7 @@
             this.values = temp.data._embedded.deliveries;
 
             this.newValue = {
-                'ordeerId': '',
+                'orderId': '',
                 'storeId': '',
                 'menuId': '',
                 'qty': 0,
