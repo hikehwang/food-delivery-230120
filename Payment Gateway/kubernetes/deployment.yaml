@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: Payment Gateway
+  labels:
+    app: Payment Gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: Payment Gateway
+  template:
+    metadata:
+      labels:
+        app: Payment Gateway
+    spec:
+      containers:
+        - name: Payment Gateway
+          image: username/Payment Gateway:latest
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: '/actuator/health'
+              port: 8080
+            initialDelaySeconds: 10
+            timeoutSeconds: 2
+            periodSeconds: 5
+            failureThreshold: 10
+          livenessProbe:
+            httpGet:
+              path: '/actuator/health'
+              port: 8080
+            initialDelaySeconds: 120
+            timeoutSeconds: 2
+            periodSeconds: 5
+            failureThreshold: 5
