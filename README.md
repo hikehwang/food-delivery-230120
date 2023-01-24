@@ -67,7 +67,7 @@ mvn spring-boot:run
 
 cd history
 mvn spring-boot:run
-
+```
 
 # 체크포인트 구현:
 
@@ -83,8 +83,7 @@ kafka를 통한 Pub/Sub 비동기 통신
 
         OrderCanceled orderCanceled = new OrderCanceled(this);
         orderCanceled.publishAfterCommit();
-    }
-    
+    }    
 ```
 - Subscribe 예제 코드
 ```
@@ -129,7 +128,6 @@ public class PolicyHandler {
 
     }
 }
-
 ```
 
 ## 2. CQRS
@@ -160,8 +158,6 @@ public class Status {
     private String storeStatus;
     private String delieveryStatus;
 }
-
-
 ```
 - Status View Handler
 ```
