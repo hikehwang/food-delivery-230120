@@ -46,7 +46,7 @@
 
 
 ## Event Storming 결과
-  ![image](https://user-images.githubusercontent.com/93691092/211801743-06ebeb97-e2d8-4a2e-9888-c9f1370e8284.png)
+  ![image](https://user-images.githubusercontent.com/80295023/214212164-7e7fb651-9a47-42b3-b444-29120739a0fe.png)
 
 
 # 구현:
