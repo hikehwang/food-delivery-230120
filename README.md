@@ -345,13 +345,6 @@ public class StatusViewHandler {
 }
 ```
 
-- 주문 command
-    ![image](https://user-images.githubusercontent.com/93691092/212068554-1e0e894a-e956-4632-ac8e-a39cc875837c.png)
-- kafka monitoring 
-    ![image](https://user-images.githubusercontent.com/93691092/212069459-ed71c1c6-c538-4559-89cb-dd07dc59d8ea.png)
-- update 된 history 
-    ![image](https://user-images.githubusercontent.com/93691092/212069497-69a4a1f2-0d62-4a51-bd9b-c437e85c41bc.png)
-
 ## 3. Compensation / Correlation
 3-1. 주문 시 상점정보에 update 하는 예제 (Correlation : orderId)
 - Store Order Repository
