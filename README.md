@@ -44,7 +44,6 @@
 ## TO-BE 조직 (Vertically-Aligned)
   ![image](https://user-images.githubusercontent.com/487999/79684159-3543c700-826a-11ea-8d5f-a3fc0c4cad87.png)
 
-
 ## Event Storming 결과
   ![image](https://user-images.githubusercontent.com/80295023/214212164-7e7fb651-9a47-42b3-b444-29120739a0fe.png)
 
@@ -54,13 +53,13 @@
 분석/설계 단계에서 도출된 헥사고날 아키텍처에 따라, 각 BC별로 대변되는 마이크로 서비스들을 스프링부트와 Java로 구현하였다. 구현한 각 서비스를 로컬에서 실행하는 방법은 아래와 같다 (각자의 포트넘버는 8081 ~ 808n 이다)
 
 ```
-cd front
+cd frontend
 mvn spring-boot:run
 
 cd store
 mvn spring-boot:run 
 
-cd customer
+cd notification
 mvn spring-boot:run  
 
 cd rider
@@ -68,72 +67,7 @@ mvn spring-boot:run
 
 cd history
 mvn spring-boot:run
-```
 
-## DDD 의 적용
-
-- 각 서비스내에 도출된 핵심 Aggregate Root 객체를 Entity 로 선언하였다: (예시는 front 마이크로 서비스). 이때 가능한 현업에서 사용하는 언어 (유비쿼터스 랭귀지)를 그대로 사용하려고 노력했다.
-
-```
-package delivery.prj.domain;
-
-import delivery.prj.FrontApplication;
-import delivery.prj.domain.OrderCanceled;
-import delivery.prj.domain.OrderPlaced;
-import java.util.Date;
-import java.util.List;
-import javax.persistence.*;
-import lombok.Data;
-
-@Entity
-@Table(name = "Order_table")
-@Data
-public class Order {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    private Long id;
-
-    private Long userId;
-
-    private Long storeId;
-
-    private Long menuId;
-
-    private String qty;
-
-    private String status;
-    
-    ...
-}
-
-```
-- Entity Pattern 과 Repository Pattern 을 적용하여 JPA 를 통하여 다양한 데이터소스 유형 (RDB or NoSQL) 에 대한 별도의 처리가 없도록 데이터 접근 어댑터를 자동 생성하기 위하여 Spring Data REST 의 RestRepository 를 적용하였다.
-```
-package delivery.prj.domain;
-
-import delivery.prj.domain.*;
-import org.springframework.data.repository.PagingAndSortingRepository;
-import org.springframework.data.rest.core.annotation.RepositoryRestResource;
-
-@RepositoryRestResource(collectionResourceRel = "orders", path = "orders")
-public interface OrderRepository
-    extends PagingAndSortingRepository<Order, Long> {
-    }
-
-```
-- 적용 후 REST API 의 테스트
-```
-# front 서비스의 주문처리
-http localhost:8081/orders menuId=20
-
-# store 서비스의 주문처리
-http PATCH localhost:8082/storeOrders status="요리시작"
-
-# 주문 상태 확인 (CQRS)
-http localhost:8085/histories/1
-
-```
 
 # 체크포인트 구현:
 
@@ -146,6 +80,9 @@ kafka를 통한 Pub/Sub 비동기 통신
     public void onPostPersist() {
         OrderPlaced orderPlaced = new OrderPlaced(this);
         orderPlaced.publishAfterCommit();
+
+        OrderCanceled orderCanceled = new OrderCanceled(this);
+        orderCanceled.publishAfterCommit();
     }
     
 ```
@@ -156,7 +93,7 @@ kafka를 통한 Pub/Sub 비동기 통신
 public class PolicyHandler {
 
     @Autowired
-    StoreOrderRepository storeOrderRepository;
+    StoreOrdersRepository storeOrdersRepository;
 
     @StreamListener(KafkaProcessor.INPUT)
     public void whatever(@Payload String eventString) {}
@@ -165,24 +102,41 @@ public class PolicyHandler {
         value = KafkaProcessor.INPUT,
         condition = "headers['type']=='OrderPlaced'"
     )
-    public void wheneverOrderPlaced_OrderInfoTransfer(
+    public void wheneverOrderPlaced_OrderInfoTransferred(
         @Payload OrderPlaced orderPlaced
     ) {
         OrderPlaced event = orderPlaced;
         System.out.println(
-            "\n\n##### listener OrderInfoTransfer : " + orderPlaced + "\n\n"
+            "\n\n##### listener OrderInfoTransferred : " + orderPlaced + "\n\n"
         );
 
-        StoreOrder.orderInfoTransfer(event);
+        // Sample Logic //
+        StoreOrders.orderInfoTransferred(event);
     }
+
+    @StreamListener(
+        value = KafkaProcessor.INPUT,
+        condition = "headers['type']=='OrderCanceled'"
+    )
+    public void wheneverOrderCanceled_CancelCooking(
+        @Payload OrderCanceled orderCanceled
+    ) {
+        OrderCanceled event = orderCanceled;
+        System.out.println(
+            "\n\n##### listener CancelCooking : " + orderCanceled + "\n\n"
+        );
+        // Sample Logic //
+
+    }
+}
 
 ```
 
 ## 2. CQRS
-History를 통한 오더상태 업데이트 정보 조회
-- History Aggregate
+dashboard를 통한 오더상태 업데이트 정보 조회
+- Status Table
 ```
-package delivery.prj.domain;
+package fooddelivery.domain;
 
 import java.util.Date;
 import java.util.List;
@@ -190,31 +144,31 @@ import javax.persistence.*;
 import lombok.Data;
 
 @Entity
-@Table(name = "History_table")
+@Table(name = "Status_table")
 @Data
-public class History {
+public class Status {
 
     @Id
-    @GeneratedValue(strategy=GenerationType.AUTO)
+    //@GeneratedValue(strategy=GenerationType.AUTO)
     private Long id;
 
-    private Long orderId;
-    private Long userId;
-    private Long storeId;
-    private Long menuId;
-    private String qty;
+    private String orderId;
+    private String userId;
+    private String storeId;
+    private String menuId;
     private String orderStatus;
     private String storeStatus;
-    private String deliveryStatus;
+    private String delieveryStatus;
 }
 
-```
-- History View Handler
-```
-package delivery.prj.infra;
 
-import delivery.prj.config.kafka.KafkaProcessor;
-import delivery.prj.domain.*;
+```
+- Status View Handler
+```
+package fooddelivery.infra;
+
+import fooddelivery.config.kafka.KafkaProcessor;
+import fooddelivery.domain.*;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
@@ -224,10 +178,10 @@ import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
 
 @Service
-public class HistoryViewHandler {
+public class StatusViewHandler {
 
     @Autowired
-    private HistoryRepository historyRepository;
+    private StatusRepository statusRepository;
 
     @StreamListener(KafkaProcessor.INPUT)
     public void whenOrderPlaced_then_CREATE_1(
@@ -237,22 +191,164 @@ public class HistoryViewHandler {
             if (!orderPlaced.validate()) return;
 
             // view 객체 생성
-            History history = new History();
+            Status status = new Status();
             // view 객체에 이벤트의 Value 를 set 함
-            history.setUserId(orderPlaced.getUserId());
-            history.setStoreId(orderPlaced.getStoreId());
-            history.setMenuId(orderPlaced.getMenuId());
-            history.setQty(orderPlaced.getQty());
-            history.setOrderId(orderPlaced.getId());
-            history.setOrderStatus("주문완료");
+            status.setOrderId(String.valueOf(orderPlaced.getId()));
+            status.setUserId(orderPlaced.getUserId());
+            status.setMenuId(orderPlaced.getMenuId());
+            status.setStoreId(orderPlaced.getStoreId());
             // view 레파지 토리에 save
-            historyRepository.save(history);
+            statusRepository.save(status);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @StreamListener(KafkaProcessor.INPUT)
+    public void whenOrderAcepted_then_UPDATE_1(
+        @Payload OrderAcepted orderAcepted
+    ) {
+        try {
+            if (!orderAcepted.validate()) return;
+            // view 객체 조회
+
+            List<Status> statusList = statusRepository.findByOrderId(
+                orderAcepted.getOrderId()
+            );
+            for (Status status : statusList) {
+                // view 객체에 이벤트의 eventDirectValue 를 set 함
+                status.setOrderStatus("Order Accepted");
+                // view 레파지 토리에 save
+                statusRepository.save(status);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @StreamListener(KafkaProcessor.INPUT)
+    public void whenOrderRejected_then_UPDATE_2(
+        @Payload OrderRejected orderRejected
+    ) {
+        try {
+            if (!orderRejected.validate()) return;
+            // view 객체 조회
+
+            List<Status> statusList = statusRepository.findByOrderId(
+                orderRejected.getOrderId()
+            );
+            for (Status status : statusList) {
+                // view 객체에 이벤트의 eventDirectValue 를 set 함
+                status.setOrderStatus("Order Rejected");
+                // view 레파지 토리에 save
+                statusRepository.save(status);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @StreamListener(KafkaProcessor.INPUT)
+    public void whenCookStarted_then_UPDATE_3(
+        @Payload CookStarted cookStarted
+    ) {
+        try {
+            if (!cookStarted.validate()) return;
+            // view 객체 조회
+
+            List<Status> statusList = statusRepository.findByOrderId(
+                cookStarted.getOrderId()
+            );
+            for (Status status : statusList) {
+                // view 객체에 이벤트의 eventDirectValue 를 set 함
+                status.setStoreStatus("Cook Started");
+                // view 레파지 토리에 save
+                statusRepository.save(status);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @StreamListener(KafkaProcessor.INPUT)
+    public void whenCoookFinished_then_UPDATE_4(
+        @Payload CoookFinished coookFinished
+    ) {
+        try {
+            if (!coookFinished.validate()) return;
+            // view 객체 조회
+
+            List<Status> statusList = statusRepository.findByOrderId(
+                coookFinished.getOrderId()
+            );
+            for (Status status : statusList) {
+                // view 객체에 이벤트의 eventDirectValue 를 set 함
+                status.setStoreStatus("Cook Finished");
+                // view 레파지 토리에 save
+                statusRepository.save(status);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @StreamListener(KafkaProcessor.INPUT)
+    public void whenDeliveryStarted_then_UPDATE_5(
+        @Payload DeliveryStarted deliveryStarted
+    ) {
+        try {
+            if (!deliveryStarted.validate()) return;
+            // view 객체 조회
+
+            List<Status> statusList = statusRepository.findByOrderId(
+                deliveryStarted.getOrderId()
+            );
+            for (Status status : statusList) {
+                // view 객체에 이벤트의 eventDirectValue 를 set 함
+                status.setDelieveryStatus("Delivery Started");
+                // view 레파지 토리에 save
+                statusRepository.save(status);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @StreamListener(KafkaProcessor.INPUT)
+    public void whenDeliveryFinished_then_UPDATE_6(
+        @Payload DeliveryFinished deliveryFinished
+    ) {
+        try {
+            if (!deliveryFinished.validate()) return;
+            // view 객체 조회
+
+            List<Status> statusList = statusRepository.findByOrderId(
+                deliveryFinished.getOrderId()
+            );
+            for (Status status : statusList) {
+                // view 객체에 이벤트의 eventDirectValue 를 set 함
+                status.setDelieveryStatus("Delivery Finished");
+                // view 레파지 토리에 save
+                statusRepository.save(status);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @StreamListener(KafkaProcessor.INPUT)
+    public void whenDeliveryFinished_then_DELETE_1(
+        @Payload DeliveryFinished deliveryFinished
+    ) {
+        try {
+            if (!deliveryFinished.validate()) return;
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 }
 ```
+
 - 주문 command
     ![image](https://user-images.githubusercontent.com/93691092/212068554-1e0e894a-e956-4632-ac8e-a39cc875837c.png)
 - kafka monitoring 
